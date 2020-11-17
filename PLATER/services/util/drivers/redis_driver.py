@@ -1,6 +1,4 @@
 import aioredis, redis
-import asyncio
-
 from PLATER.services.config import config
 from PLATER.services.util.logutil import LoggingUtil
 from PLATER.services.util.drivers.redis_trapi_cypher_compiler import cypher_query_answer_map
@@ -36,7 +34,7 @@ class RedisDriver:
         return {
             'results': [{
                 'columns': redis_results[0],
-                'data': [{'row' : x } for x in redis_results[1]]
+                'data': [{'row': x} for x in redis_results[1]]
             }],
             'errors': {}
         }
@@ -47,6 +45,7 @@ class RedisDriver:
             self.redis_client = await aioredis.create_redis(self.redis_url, encoding='utf-8')
         results = await self.redis_client.execute("GRAPH.QUERY", self.graph_name, cypher_query)
         return RedisDriver.format_cypher_result(results)
+
     @staticmethod
     def decode_if_byte(value):
         try:
@@ -100,11 +99,6 @@ class RedisDriver:
                         new_row = {}
                         row = item.get('row')
                         for col_name, col_value in zip(cols, row):
-                            # try decoding cols and rows
-                            # try: col_name = col_name.decode('utf-8')
-                            # except: pass
-                            # try: col_value = col_value.decode('utf-8')
-                            # except: pass
                             new_row[col_name] = col_value
                         array.append(new_row)
         return array
@@ -112,15 +106,13 @@ class RedisDriver:
     def transplile_TRAPI_cypher(self, trapi_question):
         return cypher_query_answer_map(trapi_question)
 
-
     async def answer_TRAPI_question(self, trapi_question):
         cypher = self.transplile_TRAPI_cypher(trapi_question)
+        logger.info("RUNNING TRAPI QUERY: ")
+        logger.info(cypher)
         results = await self.run(cypher)
         results_dict = self.convert_to_dict(results)
         return self.create_TRAPI_kg_response(trapi_question, results_dict)
-
-
-
 
     def create_TRAPI_kg_response(self, query_graph , results_dict):
         node_qg_ids = list(map(lambda x: x['id'], query_graph['nodes']))
@@ -170,16 +162,10 @@ class RedisDriver:
         return {"knowledge_graph": {"nodes": nodes_all, "edges": edges_all}, "results": answer_bindings}
 
 
-
-
-
 if __name__=='__main__':
-    # driver = Neo4jHTTPDriver(host='robokopdev.renci.org', port=7475, auth=('neo4j', 'ncatsgamma'))
     q= 'match (a) return count (a); '
-    # asyncio.run(driver.run(q))
     redis_driver = RedisDriver(host='localhost')
     results = redis_driver.query_redis_graph("""   
     MATCH (n0:`chemical_substance` {`id`: 'CHEBI:39385'})-[e0]-(n1:`named_thing` {}) WITH n0 AS n0, n1 AS n1, collect(e0) AS e0 RETURN n0,n1,e0
     """)
-    # asyncio.run(redis_driver.run_query("""
     results

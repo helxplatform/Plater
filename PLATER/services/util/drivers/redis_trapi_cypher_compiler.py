@@ -23,24 +23,24 @@ class NodeReference():
         if not isinstance(labels, list):
             labels = [labels]
         props = {}
-
+        filters = []
         curie = node.pop("curie", None)
         if curie is not None:
             if isinstance(curie, str):
                 props['id'] = curie
-                filters = ''
             elif isinstance(curie, list):
-                filters = []
                 for ci in curie:
                     # generate curie-matching condition
                     filters.append(f"{name}.id = '{ci}'")
                 # union curie-matching filters together
-                filters = ' OR '.join(filters)
             else:
                 raise TypeError("Curie should be a string or list of strings.")
-        else:
-            filters = ''
 
+        if labels:
+            for label in labels:
+                filters.append(f"'{label}' in {name}.category")
+        filters = 'OR '.join(filters)
+        self._filters = filters
         node.pop('name', None)
         node.pop('set', False)
         props.update(node)
@@ -59,9 +59,7 @@ class NodeReference():
         """Return the cypher node reference."""
         self._num += 1
         if self._num == 1:
-            return f'{self.name}' + \
-                   ''.join(f':`{label}`' for label in self.labels) + \
-                   f'{self.prop_string}'
+            return f'{self.name}' + f'{self.prop_string}' # + ''.join(f':`{label}`' for label in self.labels)
         return self.name
 
     @property
@@ -69,7 +67,7 @@ class NodeReference():
         """Return filters for the cypher node reference.
         To be used in a WHERE clause following the MATCH clause.
         """
-        if self._num == 1:
+        if self._num >= 1:
             return self._filters
         else:
             return ''
@@ -79,7 +77,7 @@ class NodeReference():
         """Return extras for the cypher node reference.
         To be appended to the MATCH clause.
         """
-        if self._num == 1:
+        if self._num >= 1:
             return self._extras
         else:
             return ''
@@ -220,5 +218,4 @@ def cypher_query_answer_map(qgraph, **kwargs):
         query_string += f' SKIP {kwargs["skip"]}'
     if 'limit' in kwargs:
         query_string += f' LIMIT {kwargs["limit"]}'
-
     return query_string

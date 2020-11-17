@@ -5,7 +5,7 @@ ARG GID=1000
 RUN groupadd -o -g $GID plater
 RUN useradd -m -u $UID -g $GID -s /bin/bash plater
 WORKDIR /home/plater
-RUN git clone https://github.com/TranslatorSRI/Plater.git
+RUN git clone https://github.com/YaphetKG/Plater.git
 WORKDIR /home/plater/Plater
 ENV PYTHONPATH=/home/plater/Plater
 
