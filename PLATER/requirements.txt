@@ -9,3 +9,4 @@ git+https://github.com/ranking-agent/reasoner.git
 git+https://github.com/TranslatorSRI/reasoner-pydantic@v1.0#egg=reasoner-pydantic
 git+https://github.com/patrickkwang/fastapi#egg=fastapi
 httpx
+aioredis

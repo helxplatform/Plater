@@ -34,12 +34,14 @@ APP = FastAPI()
 def get_graph_interface():
     """Get graph interface."""
     return GraphInterface(
-        config.get('NEO4J_HOST'),
-        config.get('NEO4J_HTTP_PORT'),
-        (
-            config.get('NEO4J_USERNAME'),
-            config.get('NEO4J_PASSWORD')
-        )
+        host=config.get('DB_HOST'),
+        port=config.get('DB_PORT'),
+        auth=(
+            config.get('DB_USERNAME'),
+            config.get('DB_PASSWORD')
+        ),
+        db_type=config.get('DB_TYPE'),
+        db_name=config.get('DB_NAME')
     )
 
 

@@ -30,10 +30,12 @@ To run the web server directly:
    ```bash   
     WEB_HOST=0.0.0.0
     WEB_PORT=8080
-    NEO4J_HOST=neo4j
-    NEO4J_USERNAME=neo4j
-    NEO4J_PASSWORD=<change_me>    
-    NEO4J_HTTP_PORT=7474
+    DB_HOST=neo4j
+    DB_USERNAME=neo4j
+    DB_PASSWORD=''  
+    DB_PORT=7474
+    DB_NAME=test
+    DB_TYPE=redis
     PLATER_TITLE='Plater'
     PLATER_VERSION='1.0.0'
     
@@ -79,10 +81,12 @@ To run the web server directly:
  Eg:
  ```bash
 docker run -p 0.0.0.0:8999:8080  \
-               --env NEO4J_HOST=<your_neo_host> \
-               --env NEO4J_HTTP_PORT=<your_neo4j_http_port> \
-               --env NEO4J_USERNAME=neo4j\
-               --env NEO4J_PASSWORD=<neo4j_password> \
+               --env DB_HOST=<your_db_host> \
+               --env DB_PORT=<your_db_port> \
+               --env DB_USERNAME=neo4j\
+               --env DB_PASSWORD=<neo4j_password> \
+               --env DB_NAME=<required for redis> \ 
+               --env DB_TYPE=<redis or neo4j> \  
                --env WEB_HOST=0.0.0.0 \
                -v <your-custom-about>:/<path-to-plater-repo-home>/plater/about.json \
                --network=<docker_network_neo4j_is_running_at> \    

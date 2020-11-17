@@ -4,6 +4,8 @@ import traceback
 import httpx
 
 from PLATER.services.config import config
+from PLATER.services.util.drivers.neo4j_driver import Neo4jHTTPDriver
+from PLATER.services.util.drivers.redis_driver import RedisDriver
 from PLATER.services.util.logutil import LoggingUtil
 from bmt import Toolkit
 
@@ -13,153 +15,17 @@ logger = LoggingUtil.init_logging(__name__,
                                   config.get('logging_format')
                                   )
 
-
-class Neo4jHTTPDriver:
-    def __init__(self, host: str, port: int,  auth: set, scheme: str = 'http'):
-        self._host = host
-        self._neo4j_transaction_endpoint = "/db/data/transaction/commit"
-        self._scheme = scheme
-        self._full_transaction_path = f"{self._scheme}://{self._host}:{port}{self._neo4j_transaction_endpoint}"
-        self._port = port
-        self._supports_apoc = None
-        self._header = {
-                'Accept': 'application/json; charset=UTF-8',
-                'Content-Type': 'application/json',
-                'Authorization': 'Basic %s' % base64.b64encode(f"{auth[0]}:{auth[1]}".encode('utf-8')).decode('utf-8')
-            }
-        # ping and raise error if neo4j doesn't respond.
-        logger.debug('PINGING NEO4J')
-        self.ping()
-        logger.debug('CHECKING IF NEO4J SUPPORTS APOC')
-        self.check_apoc_support()
-        logger.debug(f'SUPPORTS APOC : {self._supports_apoc}')
-
-    async def post_request_json(self, payload):
-        async with httpx.AsyncClient(timeout=600) as session:
-            response = await session.post(self._full_transaction_path, json=payload, headers=self._header)
-            if response.status_code != 200:
-                logger.error(f"[x] Problem contacting Neo4j server {self._host}:{self._port} -- {response.status_code}")
-                txt = response.text
-                logger.debug(f"[x] Server responded with {txt}")
-            else:
-                return response.json()
-
-    def ping(self):
-        """
-        Pings the neo4j backend.
-        :return:
-        """
-        neo4j_db_labels_endpoint = "/db/data/labels"
-        ping_url = f"{self._scheme}://{self._host}:{self._port}{neo4j_db_labels_endpoint}"
-        # if we can't contact neo4j, we should exit.
-        try:
-            import time
-            now = time.time()
-            response = httpx.get(ping_url, headers=self._header)
-            later = time.time()
-            time_taken = later - now
-            logger.debug(f'Contacting neo4j took {time_taken} seconds.')
-            if time_taken > 5:  # greater than 5 seconds it's not healthy
-                logger.warn(f"Contacting neo4j took more than 5 seconds ({time_taken}). Neo4j might be stressed.")
-            if response.status_code != 200:
-                raise Exception(f'server returned {response.status_code}')
-        except Exception as e:
-            logger.error(f"Error contacting Neo4j @ {ping_url} -- Exception raised -- {e}")
-            logger.debug(traceback.print_exc())
-            raise RuntimeError('Connection to Neo4j could not be established.')
-
-    async def run(self, query, return_errors=False):
-        """
-        Runs a neo4j query async.
-        :param query: Cypher query.
-        :type query: str
-        :return: result of query.
-        :rtype: dict
-        """
-        # make the statement dictionary
-        payload = {
-            "statements": [
-                {
-                    "statement": f"{query}"
-                }
-            ]
-        }
-
-        response = await self.post_request_json(payload)
-        errors = response.get('errors')
-        if errors:
-            if return_errors:
-                return response
-            logger.error(f'Neo4j returned `{errors}` for cypher {query}.')
-            raise RuntimeWarning(f'Error running cypher {query}.')
-        return response
-
-    def run_sync(self, query):
-        """
-        Runs a neo4j query. Can cause the async loop to block.
-        :param query:
-        :return:
-        """
-        payload = {
-            "statements": [
-                {
-                    "statement": f"{query}"
-                }
-            ]
-        }
-        response = httpx.post(
-            self._full_transaction_path,
-            headers=self._header,
-            timeout=600,
-            json=payload).json()
-        errors = response.get('errors')
-        if errors:
-            logger.error(f'Neo4j returned `{errors}` for cypher {query}.')
-            raise RuntimeWarning(f'Error running cypher {query}.')
-        return response
-
-    def convert_to_dict(self, response: dict) -> list:
-        """
-        Converts a neo4j result to a structured result.
-        :param response: neo4j http raw result.
-        :type response: dict
-        :return: reformatted dict
-        :rtype: dict
-        """
-        results = response.get('results')
-        array = []
-        if results:
-            for result in results:
-                cols = result.get('columns')
-                if cols:
-                    data_items = result.get('data')
-                    for item in data_items:
-                        new_row = {}
-                        row = item.get('row')
-                        for col_name, col_value in zip(cols, row):
-                            new_row[col_name] = col_value
-                        array.append(new_row)
-        return array
-
-    def check_apoc_support(self):
-        apoc_version_query = 'call apoc.help("meta")'
-        if self._supports_apoc is None:
-            try:
-                self.run_sync(apoc_version_query)
-                self._supports_apoc = True
-            except:
-                self._supports_apoc = False
-        return self._supports_apoc
-
-
 class GraphInterface:
     """
     Singleton class for interfacing with the graph.
     """
 
     class _GraphInterface:
-        def __init__(self, host, port, auth):
-            self.driver = Neo4jHTTPDriver(host=host, port=port, auth=auth)
+        def __init__(self, host, port, auth, backend='neo4j', db_name=None):
+            if backend == 'neo4j':
+                self.driver = Neo4jHTTPDriver(host=host, port=port, auth=auth)
+            elif backend == 'redis':
+                self.driver = RedisDriver(host=host, port=port, password=auth[1], graph_db_name=db_name)
             self.schema = None
             self.summary = None
             self.toolkit = Toolkit()
@@ -188,8 +54,7 @@ class GraphInterface:
             self.schema_raw_result = {}
             if self.schema is None:
                 query = """
-                           MATCH (a)-[x]->(b)
-                           WHERE not a:Concept and not b:Concept                                                          
+                           MATCH (a)-[x]->(b)                                                                                  
                            RETURN DISTINCT labels(a) as source_labels, type(x) as predicate, labels(b) as target_labels
                            """
                 logger.info(f"starting query {query} on graph... this might take a few")
@@ -206,9 +71,13 @@ class GraphInterface:
                     # This filter is to avoid that scenario.
                     # @TODO need to remove this filter when data build avoids adding nodes with single ['biolink:NamedThing'] labels.
                     filter_named_thing = lambda x: filter(lambda y: y != 'biolink:NamedThing', x)
-                    source_labels, predicate, target_labels = self.find_biolink_leaves(filter_named_thing(triplet['source_labels'])), \
+                    # For redis convert these to arrays
+                    source_labels = [triplet['source_labels']] if isinstance(triplet['source_labels'], str) else triplet['source_labels']
+                    target_labels = [triplet['target_labels']] if isinstance(triplet['target_labels'], str) else triplet['target_labels']
+                    source_labels, predicate, target_labels = self.find_biolink_leaves(filter_named_thing(source_labels)), \
                                                               triplet['predicate'], \
                                                               self.find_biolink_leaves(filter_named_thing(triplet['target_labels']))
+
                     for source_label in source_labels:
                         for target_label in target_labels:
                             structured_expanded.append(
@@ -247,6 +116,7 @@ class GraphInterface:
                     summary = {}
                     for node in raw:
                         labels = node['types']
+                        labels = labels if isinstance(labels, list) else[labels]
                         count = node['count']
                         query = f"""
                         MATCH (:{':'.join(labels)})-[e]->(b) WITH DISTINCT e , b 
@@ -261,7 +131,9 @@ class GraphInterface:
                             'nodes_count': count
                         }
                         for row in raw:
-                            target_key = ':'.join(row['target_labels'])
+                            target_label = row['target_labels']
+                            target_label = [target_label] if isinstance(target_label, str) else target_label
+                            target_key = ':'.join(target_label)
                             edge_name = row['edge_types']
                             edge_count = row['edge_counts']
                             summary[summary_key][target_key] = summary[summary_key].get(target_key, {})
@@ -417,12 +289,16 @@ class GraphInterface:
         def convert_to_dict(self, result):
             return self.driver.convert_to_dict(result)
 
+        async def answer_trapi_question(self, trapi_question):
+            trapi_question.update(await self.driver.answer_TRAPI_question(trapi_question))
+            return trapi_question
+
     instance = None
 
-    def __init__(self, host, port, auth):
+    def __init__(self, host, port, auth, db_name, db_type):
         # create a new instance if not already created.
         if not GraphInterface.instance:
-            GraphInterface.instance = GraphInterface._GraphInterface(host=host, port=port, auth=auth)
+            GraphInterface.instance = GraphInterface._GraphInterface(host=host, port=port, auth=auth, backend= db_type ,db_name=db_name)
 
     def __getattr__(self, item):
         # proxy function calls to the inner object.
