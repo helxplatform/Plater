@@ -1,12 +1,12 @@
 ## PLATER
 
-PLATER is a service to stand up REST endpoint over a neo4j database.
+PLATER is a service to stand up REST endpoint over a neo4j or redis graph database.
 There are some restrictions on the data structure of the Neo4j backend to be fully utilized through PLATER.
 
-> **NEO4J data structure restrictions:**
+> **Data structure restrictions:**
 > * All nodes should have an `id` to be searchable (Used in querying single Nodes)
 > * All edges should have an `id` to be searchable (Used in generating ReasonerAPI)
-> * Nodes labeled `Concept` are ignored. 
+> * Data is recommended to comply to the [Translator Reasoner API](https://github.com/NCATSTranslator/ReasonerAPI).
 
 ### Installation
 
@@ -30,12 +30,12 @@ To run the web server directly:
    ```bash   
     WEB_HOST=0.0.0.0
     WEB_PORT=8080
-    DB_HOST=neo4j
-    DB_USERNAME=neo4j
-    DB_PASSWORD=''  
-    DB_PORT=7474
-    DB_NAME=test
-    DB_TYPE=redis
+    DB_HOST=<neo4j_or_redis_address>
+    DB_USERNAME=<user name required for neo4j, empty for redis>
+    DB_PASSWORD=''
+    DB_PORT=<redis port or neo4j http port>
+    DB_NAME=<db name for redis, uses default db for neo4j>
+    DB_TYPE=<use values 'redis' or 'neo4j'>
     PLATER_TITLE='Plater'
     PLATER_VERSION='1.0.0'
     
@@ -83,15 +83,14 @@ To run the web server directly:
 docker run -p 0.0.0.0:8999:8080  \
                --env DB_HOST=<your_db_host> \
                --env DB_PORT=<your_db_port> \
-               --env DB_USERNAME=neo4j\
-               --env DB_PASSWORD=<neo4j_password> \
+               --env DB_USERNAME=<db_user_name required for neo4j, ignored for redis> \
+               --env DB_PASSWORD=<db_password> \
                --env DB_NAME=<required for redis> \ 
                --env DB_TYPE=<redis or neo4j> \  
                --env WEB_HOST=0.0.0.0 \
                -v <your-custom-about>:/<path-to-plater-repo-home>/plater/about.json \
                --network=<docker_network_neo4j_is_running_at> \    
-                <image_tag>
-    
+                <image_tag>   
 ``` 
  
    

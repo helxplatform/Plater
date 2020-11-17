@@ -151,6 +151,8 @@ class Neo4jHTTPDriver:
 
     async def answer_TRAPI_question(self, trapi_question):
         cypher_query = get_query(trapi_question)
+        logger.info("RUNNING TRAPI QUERY:")
+        logger.info(cypher_query)
         results = await self.run(cypher_query)
         results_dict = self.convert_to_dict(results)[0]
         trapi_question.update(results_dict)
