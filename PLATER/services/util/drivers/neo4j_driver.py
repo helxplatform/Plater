@@ -155,7 +155,7 @@ class Neo4jHTTPDriver:
         logger.info(cypher_query)
         results = await self.run(cypher_query)
         results_dict = self.convert_to_dict(results)[0]
-        trapi_question.update(results_dict)
-        return trapi_question
+        results_dict.update({'query_graph': trapi_question})
+        return results_dict
 
 

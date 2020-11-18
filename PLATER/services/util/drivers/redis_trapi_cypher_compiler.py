@@ -23,7 +23,7 @@ class NodeReference():
         if not isinstance(labels, list):
             labels = [labels]
         props = {}
-        filters = []
+        curie_filters = []
         curie = node.pop("curie", None)
         if curie is not None:
             if isinstance(curie, str):
@@ -31,15 +31,18 @@ class NodeReference():
             elif isinstance(curie, list):
                 for ci in curie:
                     # generate curie-matching condition
-                    filters.append(f"{name}.id = '{ci}'")
+                    curie_filters.append(f"{name}.id = '{ci}'")
                 # union curie-matching filters together
             else:
                 raise TypeError("Curie should be a string or list of strings.")
-
+        label_filters = []
         if labels:
             for label in labels:
-                filters.append(f"'{label}' in {name}.category")
-        filters = 'OR '.join(filters)
+                label_filters.append(f"'{label}' in {name}.category")
+        if len(curie_filters):
+            filters = '( ' + ' OR '.join(curie_filters) + ') AND (' + ' OR '.join(label_filters) + ')'
+        else:
+            filters = ' OR '.join(label_filters)
         self._filters = filters
         node.pop('name', None)
         node.pop('set', False)
@@ -67,10 +70,7 @@ class NodeReference():
         """Return filters for the cypher node reference.
         To be used in a WHERE clause following the MATCH clause.
         """
-        if self._num >= 1:
-            return self._filters
-        else:
-            return ''
+        return self._filters
 
     @property
     def extras(self):
@@ -116,7 +116,8 @@ class EdgeReference:
         """Return the cypher edge reference."""
         self._num += 1
         if self._num == 1:
-            innards = f'{self.name}{":" + self.label if self.label else ""}'
+            label = f':`{self.label}`' if self.label else ''
+            innards = f'{self.name}{label}'
         else:
             innards = self.name
         if self.directed:
@@ -129,10 +130,7 @@ class EdgeReference:
         """Return filters for the cypher node reference.
         To be used in a WHERE clause following the MATCH clause.
         """
-        if self._num == 1:
-            return self._filters
-        else:
-            return ''
+        return self._filters
 
 
 def cypher_query_fragment_match(qgraph, max_connectivity=-1):
@@ -170,7 +168,7 @@ def cypher_query_fragment_match(qgraph, max_connectivity=-1):
         if max_connectivity > -1:
             filters.append(f"(size( ({target_node})-[]-() ) < {max_connectivity})")
         if filters:
-            match_strings.append("WHERE " + " AND ".join(filters))
+            match_strings.append("\nWHERE " + "\nAND ".join(filters))
 
     match_string = ' '.join(match_strings)
 
@@ -204,16 +202,16 @@ def cypher_query_answer_map(qgraph, **kwargs):
 
     returns = list(node_names) + \
               list(edge_names) + \
-              [f'[node in {x} | labels(node)] as type__{x}' for x in node_names_sets] + \
-              [f'labels({x}) as type__{x}' for x in node_names - node_names_sets] + \
-              [f'[edge in {x} | type(edge)] as type__{x}' for x in edge_names]
+              [f'[node in {x} | labels(node)] AS type__{x}' for x in node_names_sets] + \
+              [f'labels({x}) AS type__{x}' for x in node_names - node_names_sets] + \
+              [f'[edge in {x} | type(edge)] AS type__{x}' for x in edge_names]
 
     answer_return_string = f"RETURN " + ','.join(returns)
 
     clauses.append(answer_return_string)
 
     # return answer maps matching query
-    query_string = ' '.join(clauses)
+    query_string = '\n'.join(clauses)
     if 'skip' in kwargs:
         query_string += f' SKIP {kwargs["skip"]}'
     if 'limit' in kwargs:
