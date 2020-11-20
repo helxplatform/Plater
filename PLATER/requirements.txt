@@ -11,3 +11,5 @@ git+https://github.com/ranking-agent/reasoner-pydantic#egg=reasoner-pydantic
 git+https://github.com/patrickkwang/fastapi#egg=fastapi
 httpx
 aioredis
+redis
+git+https://github.com/YaphetKG/redisgraph-py.git

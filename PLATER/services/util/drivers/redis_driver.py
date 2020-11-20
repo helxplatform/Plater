@@ -21,7 +21,7 @@ class RedisDriver:
                                              encoding='utf-8',
                                              decode_responses=True)
         self.graph_name = graph_db_name
-        self.redis_graph = Graph(self.graph_name, self.sync_redis_client)
+        self.redis_graph = Graph(self.graph_name, self.sync_redis_client, read_only=True)
         self.ping_redis()
 
     def ping_redis(self):
@@ -38,13 +38,6 @@ class RedisDriver:
             }],
             'errors': {}
         }
-
-    async def run(self, cypher_query):
-        # init client here
-        if self.redis_client == None:
-            self.redis_client = await aioredis.create_redis(self.redis_url, encoding='utf-8')
-        results = await self.redis_client.execute("GRAPH.QUERY", self.graph_name, cypher_query)
-        return RedisDriver.format_cypher_result(results)
 
     @staticmethod
     def decode_if_byte(value):
