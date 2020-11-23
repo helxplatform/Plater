@@ -10,6 +10,8 @@ WORKDIR /home/plater/Plater
 ENV PYTHONPATH=/home/plater/Plater
 
 RUN pip install -r PLATER/requirements.txt
+# causes issue https://github.com/RedisGraph/RedisGraph/issues/1370
+RUN pip uninstall -y hiredis
 EXPOSE 8080
 VOLUME logs
 RUN mkdir -p PLATER/logs
