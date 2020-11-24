@@ -1,4 +1,4 @@
-import aioredis, redis
+import redis
 from PLATER.services.config import config
 from PLATER.services.util.logutil import LoggingUtil
 from PLATER.services.util.drivers.redis_trapi_cypher_compiler import cypher_query_answer_map
@@ -34,9 +34,9 @@ class RedisDriver:
         return {
             'results': [{
                 'columns': redis_results[0],
-                'data': [{'row': x} for x in redis_results[1]]
+                'data': [{'row': x, 'meta': []} for x in redis_results[1]]
             }],
-            'errors': {}
+            'errors': []
         }
 
     @staticmethod
@@ -46,7 +46,7 @@ class RedisDriver:
         except:
             return value
 
-    async def run(self, query):
+    async def run(self, query, **kwargs):
         results = self.redis_graph.query(query)
         headers = list(map(lambda x: RedisDriver.decode_if_byte(x[1]), results.header))
         response = []
@@ -69,7 +69,7 @@ class RedisDriver:
         return self.format_cypher_result((headers, response))
 
     def run_sync(self, cypher_query):
-        results = self.sync_redis_client.execute_command('GRAPH.QUERY', self.graph_name, cypher_query)
+        results = self.sync_redis_client.execute_command('GRAPH.RO_QUERY', self.graph_name, cypher_query)
         return RedisDriver.format_cypher_result(results)
 
     @staticmethod
@@ -157,8 +157,9 @@ class RedisDriver:
 
 if __name__=='__main__':
     q= 'match (a) return count (a); '
-    redis_driver = RedisDriver(host='localhost')
-    results = redis_driver.query_redis_graph("""   
+    redis_driver = RedisDriver(host='localhost', port='6380', graph_db_name='test')
+    import asyncio
+    results = asyncio.run(redis_driver.run("""   
     MATCH (n0:`chemical_substance` {`id`: 'CHEBI:39385'})-[e0]-(n1:`named_thing` {}) WITH n0 AS n0, n1 AS n1, collect(e0) AS e0 RETURN n0,n1,e0
-    """)
+    """))
     results
