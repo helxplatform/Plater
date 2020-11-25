@@ -54,7 +54,7 @@ def convert_to_dict(response: dict) -> list:
 def test_single_hop(connected_nodes_ids):
     for i in connected_nodes_ids:
         cypher_query = {
-            "query": f"MATCH (a{{id : '{i}'}})-[e]->(b) return a, e, b limit 10 "
+            "query": f"MATCH (a{{id : '{i}'}})-[e]-(b) return a, e, b"
         }
         cypher_resp = requests.post(PLATERURL + '/cypher', json=cypher_query)
         assert cypher_resp.status_code == 200
@@ -104,10 +104,10 @@ def test_single_hop(connected_nodes_ids):
                         assert row['e'][key] == edge[key]
             assert found_e
             path_array.append([row['a']['id'], row['e']['id'], row['b']['id'] ])
-            for result in trapi_response['results']:
-                assert result['node_bindings']
-                assert result['edge_bindings']
-                binding_as_dict = {r['qg_id']: r['kg_id'] for r in result['node_bindings']}
-                binding_as_dict.update({r['qg_id']: r['kg_id'] for r in result['edge_bindings']})
-                current_path = [binding_as_dict['a'], binding_as_dict['e'], binding_as_dict['b']]
-                assert current_path in path_array
+        for result in trapi_response['results']:
+            assert result['node_bindings']
+            assert result['edge_bindings']
+            binding_as_dict = {r['qg_id']: r['kg_id'] for r in result['node_bindings']}
+            binding_as_dict.update({r['qg_id']: r['kg_id'] for r in result['edge_bindings']})
+            current_path = [binding_as_dict['a'], binding_as_dict['e'], binding_as_dict['b']]
+            assert current_path in path_array
