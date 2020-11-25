@@ -10,4 +10,4 @@ git+https://github.com/TranslatorSRI/reasoner-pydantic@v1.0#egg=reasoner-pydanti
 git+https://github.com/patrickkwang/fastapi#egg=fastapi
 httpx
 redis
-git+https://github.com/YaphetKG/redisgraph-py.git
+git+https://github.com/redislabs/redisgraph-py.git
