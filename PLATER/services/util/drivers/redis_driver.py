@@ -21,7 +21,7 @@ class RedisDriver:
                                              encoding='utf-8',
                                              decode_responses=True)
         self.graph_name = graph_db_name
-        self.redis_graph = Graph(self.graph_name, self.sync_redis_client, read_only=True)
+        self.redis_graph = Graph(self.graph_name, self.sync_redis_client)
         self.ping_redis()
 
     def ping_redis(self):
@@ -47,7 +47,7 @@ class RedisDriver:
             return value
 
     async def run(self, query, **kwargs):
-        results = self.redis_graph.query(query)
+        results = self.redis_graph.query(query, read_only=True)
         headers = list(map(lambda x: RedisDriver.decode_if_byte(x[1]), results.header))
         response = []
         for row in results.result_set:
