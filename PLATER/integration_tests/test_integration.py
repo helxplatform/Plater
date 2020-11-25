@@ -52,7 +52,7 @@ def convert_to_dict(response: dict) -> list:
     return array
 
 def test_single_hop(connected_nodes_ids):
-    for i in connected_nodes_ids[:1]:
+    for i in connected_nodes_ids:
         cypher_query = {
             "query": f"MATCH (a{{id : '{i}'}})-[e]->(b) return a, e, b limit 10 "
         }
