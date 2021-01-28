@@ -5,3 +5,6 @@ __pycache__
 kubernets
 *coverage
 .idea
+publish.sh
+dist/
+*.egg/
