@@ -1,4 +1,7 @@
 """Tools for compiling QGraph into Cypher query."""
+import re
+from reasoner_converter.downgrading import downgrade_BiolinkEntity, downgrade_BiolinkPredicate
+from reasoner_converter.upgrading import upgrade_BiolinkEntity, upgrade_BiolinkRelation
 
 
 def cypher_prop_string(value):
@@ -14,17 +17,16 @@ def cypher_prop_string(value):
 class NodeReference():
     """Node reference object."""
 
-    def __init__(self, node, anonymous=False):
+    def __init__(self, node, node_id ,anonymous=False):
         """Create a node reference."""
         node = dict(node)
-        node_id = node.pop("id")
         name = f'{node_id}' if not anonymous else ''
-        labels = node.pop('type', 'named_thing')
+        labels = node.pop('category', 'named_thing')
         if not isinstance(labels, list):
             labels = [labels]
         props = {}
         curie_filters = []
-        curie = node.pop("curie", None)
+        curie = node.pop("id", None)
         if curie is not None:
             if isinstance(curie, str):
                 props['id'] = curie
@@ -37,15 +39,23 @@ class NodeReference():
                 raise TypeError("Curie should be a string or list of strings.")
         label_filters = []
         if labels:
+            biolink_regex = "^biolink:[A-Z][a-zA-Z]*$"
             for label in labels:
                 label_filters.append(f"'{label}' in {name}.category")
+                is_biolinkified = re.match(biolink_regex, label)
+                if is_biolinkified:
+                    other_label =  downgrade_BiolinkEntity(label)
+                else:
+                    other_label = upgrade_BiolinkEntity(label)
+                label_filters.append(f"'{other_label}' in {name}.category")
+
         if len(curie_filters):
             filters = '( ' + ' OR '.join(curie_filters) + ') AND (' + ' OR '.join(label_filters) + ')'
         else:
             filters = ' OR '.join(label_filters)
         self._filters = filters
         node.pop('name', None)
-        node.pop('set', False)
+        node.pop('is_set', False)
         props.update(node)
 
         self.name = name
@@ -86,19 +96,27 @@ class NodeReference():
 class EdgeReference:
     """Edge reference object."""
 
-    def __init__(self, edge, anonymous=False):
+    def __init__(self, edge, edge_id, anonymous=False):
         """Create an edge reference."""
-        name = f'{edge["id"]}' if not anonymous else ''
-        label = edge['type'] if 'type' in edge else None
 
-        if 'type' in edge and edge['type'] is not None:
-            if isinstance(edge['type'], str):
-                label = edge['type']
+        name = f'{edge_id}' if not anonymous else ''
+        label = edge['predicate'] if 'predicate' in edge else None
+
+        if 'predicate' in edge and edge['predicate'] is not None:
+            if isinstance(edge['predicate'], str):
+                label = edge['predicate']
                 filters = ''
-            elif isinstance(edge['type'], list):
+            elif isinstance(edge['predicate'], list):
                 filters = []
-                for predicate in edge['type']:
+                biolink_predicate_regex = "^biolink:[a-z][a-z_]*$"
+                for predicate in edge['predicate']:
+                    is_biolink_predicate = re.match(biolink_predicate_regex, predicate)
                     filters.append(f'type({name}) = "{predicate}"')
+                    if is_biolink_predicate:
+                        other_predicate = downgrade_BiolinkPredicate(predicate)
+                    else:
+                        other_predicate = upgrade_BiolinkRelation(predicate)
+                    filters.append(f'type({name}) = "{other_predicate}" ')
                 filters = ' OR '.join(filters)
                 label = None
         else:
@@ -109,7 +127,7 @@ class EdgeReference:
         self.label = label
         self._num = 0
         self._filters = filters
-        has_type = 'type' in edge and edge['type']
+        has_type = 'predicate' in edge and edge['predicate']
         self.directed = edge.get('directed', has_type)
 
     def __str__(self):
@@ -141,16 +159,16 @@ def cypher_query_fragment_match(qgraph, max_connectivity=-1):
     nodes, edges = qgraph['nodes'], qgraph['edges']
 
     # generate internal node and edge variable names
-    node_references = {n['id']: NodeReference(n) for n in nodes}
-    edge_references = [EdgeReference(e) for e in edges]
+    node_references = {n: NodeReference(node=nodes[n], node_id=n) for n in nodes}
+    edge_references = {e: EdgeReference(edge=edges[e], edge_id=e) for e in edges}
 
     match_strings = []
 
     # match orphaned nodes
     def flatten(l):
         return [e for sl in l for e in sl]
-    all_nodes = {n['id'] for n in nodes}
-    all_referenced_nodes = set(flatten([[e['source_id'], e['target_id']] for e in edges]))
+    all_nodes = set(nodes.keys())
+    all_referenced_nodes = set(flatten([[edges[e]['subject'], edges[e]['object']] for e in edges]))
     orphaned_nodes = all_nodes - all_referenced_nodes
     for n in orphaned_nodes:
         match_strings.append(f"MATCH ({node_references[n]})")
@@ -159,9 +177,10 @@ def cypher_query_fragment_match(qgraph, max_connectivity=-1):
             match_strings.append("WHERE " + node_references[n].filters)
 
     # match edges
-    for e, eref in zip(edges, edge_references):
-        source_node = node_references[e['source_id']]
-        target_node = node_references[e['target_id']]
+    for edge_id, eref in edge_references.items():
+        e = edges[edge_id]
+        source_node = node_references[e['subject']]
+        target_node = node_references[e['object']]
         match_strings.append(f"MATCH ({source_node}){eref}({target_node})")
         match_strings[-1] += source_node.extras + target_node.extras
         filters = [f'({c})' for c in [source_node.filters, target_node.filters, eref.filters] if c]
@@ -188,14 +207,14 @@ def cypher_query_answer_map(qgraph, **kwargs):
     nodes, edges = qgraph['nodes'], qgraph['edges']
 
     # generate internal node and edge variable names
-    node_names = set(f"{n['id']}" for n in nodes)
-    node_names_sets = set(f"{n['id']}" for n in filter(lambda n: n.get('set') , nodes))
-    edge_names = set(f"{e['id']}" for e in edges)
+    node_names = set(nodes.keys())
+    node_names_sets = set(f"{n}" for n in filter(lambda n: nodes[n].get('is_set'), nodes))
+    edge_names = set(edges.keys())
 
     # deal with sets
-    node_id_accessor = [f"collect({n['id']}) AS {n['id']}" if 'set' in n and n['set']
-                        else f"{n['id']} AS {n['id']}" for n in nodes]
-    edge_id_accessor = [f"collect({e['id']}) AS {e['id']}" for e in edges]
+    node_id_accessor = [f"collect({n}) AS {n}" if n in node_names_sets
+                        else f"{n} AS {n}" for n in node_names]
+    edge_id_accessor = [f"collect({e}) AS {e}" for e in edge_names]
     if node_id_accessor or edge_id_accessor:
         with_string = f"WITH {', '.join(node_id_accessor+edge_id_accessor)}"
         clauses.append(with_string)
@@ -204,7 +223,8 @@ def cypher_query_answer_map(qgraph, **kwargs):
               list(edge_names) + \
               [f'[node in {x} | labels(node)] AS type__{x}' for x in node_names_sets] + \
               [f'labels({x}) AS type__{x}' for x in node_names - node_names_sets] + \
-              [f'[edge in {x} | type(edge)] AS type__{x}' for x in edge_names]
+              [f'[edge in {x} | type(edge)] AS type__{x}' for x in edge_names] + \
+              [f'[edge in {x} | [startNode(edge).id, endNode(edge).id]] AS id_pairs__{x}' for x in edge_names]
 
     answer_return_string = f"RETURN " + ','.join(returns)
 

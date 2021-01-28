@@ -3,7 +3,7 @@ from PLATER.services.config import config
 from PLATER.services.util.logutil import LoggingUtil
 from PLATER.services.util.drivers.redis_trapi_cypher_compiler import cypher_query_answer_map
 from redisgraph import Graph, Node, Edge
-
+from reasoner_converter.upgrading import upgrade_BiolinkRelation, upgrade_BiolinkEntity
 
 logger = LoggingUtil.init_logging(__name__,
                                   config.get('logging_level'),
@@ -105,52 +105,83 @@ class RedisDriver:
         logger.info(cypher)
         results = await self.run(cypher)
         results_dict = self.convert_to_dict(results)
-        return self.create_TRAPI_kg_response(trapi_question, results_dict)
+        response = self.create_TRAPI_kg_response(trapi_question, results_dict)
+        return response
 
     def create_TRAPI_kg_response(self, query_graph , results_dict):
-        node_qg_ids = list(map(lambda x: x['id'], query_graph['nodes']))
-        edge_qg_ids = list(map(lambda x: x['id'], query_graph['edges']))
+        node_qg_ids = list(query_graph['nodes'].keys())
+        edge_qg_ids = list(query_graph['edges'].keys())
         answer_bindings = []
-        nodes_all = []
-        edges_all = []
+        nodes_all = {}
+        edges_all = {}
         collected_nodes = set()
         collected_edges = set()
 
         for row in results_dict:
-            # {n0: {dict} , n1: [list{dict}] , e0: [list{dict}] etc...
             current_answer_bindings = {
-                'node_bindings': [],
-                'edge_bindings': []
+                'node_bindings': {},
+                'edge_bindings': {}
             }
             bound_nodes = {}
             for qg_id in node_qg_ids:
+                # Convert nodes and node types to list
                 nodes = row[qg_id] if isinstance(row[qg_id], list) else [row[qg_id]]
                 node_types = row[f'type__{qg_id}'] if isinstance(row[qg_id], list) else [row[f'type__{qg_id}']]
+                current_node_binding = {qg_id: []}
                 for node, node_type in zip(nodes, node_types):
-                    node_id = node['id']
-                    current_answer_bindings['node_bindings'] += [{'qg_id': qg_id, 'kg_id': node_id, 'type': node_type}]
+                    node_id = node.pop('id')
+                    assert node_id, 'Error, did not find ID from Node in db'
+                    current_node_binding[qg_id].append({'id': node_id})
                     bound_nodes[qg_id] = bound_nodes.get(qg_id, [])
                     bound_nodes[qg_id].append(node_id)
                     if node_id not in collected_nodes:
+                        new_node = {}
                         collected_nodes.add(node_id)
-                        node.update({'type': node_type})
-                        nodes_all.append(node)
+                        new_node['category'] = [upgrade_BiolinkEntity(x) for x in node['category']]
+                        new_node['name'] = node.get('name', '')
+                        new_node['attributes'] = []
+                        for key, value in node.items():
+                            if key in new_node:
+                                continue
+                            new_node['attributes'].append({
+                                'type': 'NA',
+                                'value': value,
+                                'name': key
+                            })
+                        nodes_all[node_id] = new_node
+            current_answer_bindings['node_bindings'].update(current_node_binding)
             for qg_id in edge_qg_ids:
                 edges = row[qg_id] if isinstance(row[qg_id], list) else [row[qg_id]]
                 edge_types = row[f'type__{qg_id}'] if isinstance(row[qg_id], list) else [row[f'type__{qg_id}']]
+                id_pairs = row[f'id_pairs__{qg_id}']
                 index = 0
-                for edge, edge_type in zip(edges, edge_types):
-                    edge_id = edge['id']
-                    current_answer_bindings['edge_bindings'] += [{'qg_id': qg_id, 'kg_id': edge_id, 'type': edge_type}]
+                current_edge_binding = {qg_id: []}
+                for edge, edge_type, id_pair in zip(edges, edge_types, id_pairs):
+                    edge_id = edge.pop('id')
+                    current_edge_binding[qg_id].append({'id': edge_id})
                     if edge_id not in collected_edges:
-                        edge_in_query_graph = list(filter(lambda x: x['id'] == qg_id, query_graph['edges']))[0]
-                        source_q_id, target_q_id = edge_in_query_graph['source_id'], edge_in_query_graph['target_id']
-                        source_real_id, target_real_id = bound_nodes[source_q_id][index if len(bound_nodes[source_q_id]) > 1 else 0]\
-                            , bound_nodes[target_q_id][index if len(bound_nodes[target_q_id]) > 1 else 0]
-                        edge.update({'source_id': source_real_id, 'target_id': target_real_id, 'type': edge_type})
+                        edge_in_query_graph = query_graph['edges'][qg_id]
+                        source_real_id, target_real_id = id_pair
+                        edge_type = upgrade_BiolinkRelation(edge_type)
+                        new_edge = {
+                            'subject': source_real_id,
+                            'object': target_real_id,
+                            'predicate': edge_type,
+                            'attributes': []
+                        }
+                        for key, value in edge.items():
+                            if key in new_edge:
+                                continue
+                            new_edge['attributes'].append({
+                                'type': 'NA',
+                                'name': key,
+                                'value': value
+                            })
                         collected_edges.add(edge_id)
-                        edges_all.append(edge)
+                        edges_all[edge_id] = new_edge
                         index += 1
+
+                current_answer_bindings['edge_bindings'].update(current_edge_binding)
             answer_bindings += [current_answer_bindings]
         return {"knowledge_graph": {"nodes": nodes_all, "edges": edges_all}, "results": answer_bindings}
 

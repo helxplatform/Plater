@@ -34,15 +34,11 @@ class Question:
         :param graph_interface: interface for neo4j
         :return: None
         """
-        cypher = self.compile_cypher()
-        print(cypher)
         s = time.time()
-        results = await graph_interface.run_cypher(cypher)
+        answer = await graph_interface.answer_trapi_question(self._question_json['query_graph'])
         end = time.time()
         print(f'grabbing results took {end - s}')
-        results_dict = graph_interface.convert_to_dict(results)
-        self._question_json.update(results_dict[0])
-        return self._question_json
+        return answer
 
     @staticmethod
     def transform_schema_to_question_template(graph_schema):

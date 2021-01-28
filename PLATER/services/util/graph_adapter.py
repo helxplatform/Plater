@@ -76,7 +76,7 @@ class GraphInterface:
                     target_labels = [triplet['target_labels']] if isinstance(triplet['target_labels'], str) else triplet['target_labels']
                     source_labels, predicate, target_labels = self.find_biolink_leaves(filter_named_thing(source_labels)), \
                                                               triplet['predicate'], \
-                                                              self.find_biolink_leaves(filter_named_thing(triplet['target_labels']))
+                                                              self.find_biolink_leaves(filter_named_thing(target_labels))
 
                     for source_label in source_labels:
                         for target_label in target_labels:
