@@ -8,6 +8,6 @@ git+git://github.com/patrickkwang/biolink-model-toolkit@master#egg=bmt
 git+https://github.com/ranking-agent/reasoner.git
 git+https://github.com/TranslatorSRI/reasoner-pydantic@v1.0#egg=reasoner-pydantic
 git+https://github.com/patrickkwang/fastapi#egg=fastapi
+git+https://github.com/redislabs/redisgraph-py.git
 httpx
 redis
-git+https://github.com/redislabs/redisgraph-py.git
