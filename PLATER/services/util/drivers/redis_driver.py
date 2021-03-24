@@ -149,7 +149,7 @@ class RedisDriver:
                                 'name': key
                             })
                         nodes_all[node_id] = new_node
-            current_answer_bindings['node_bindings'].update(current_node_binding)
+                current_answer_bindings['node_bindings'].update(current_node_binding)
             for qg_id in edge_qg_ids:
                 edges = row[qg_id] if isinstance(row[qg_id], list) else [row[qg_id]]
                 edge_types = row[f'type__{qg_id}'] if isinstance(row[qg_id], list) else [row[f'type__{qg_id}']]
