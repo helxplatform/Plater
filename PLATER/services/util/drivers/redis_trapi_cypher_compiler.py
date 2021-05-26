@@ -170,11 +170,16 @@ def cypher_query_fragment_match(qgraph, max_connectivity=-1):
     all_nodes = set(nodes.keys())
     all_referenced_nodes = set(flatten([[edges[e]['subject'], edges[e]['object']] for e in edges]))
     orphaned_nodes = all_nodes - all_referenced_nodes
+    nodes_with_id = [n_id for n_id, node in nodes.items() if node.get('id')]
     for n in orphaned_nodes:
         match_strings.append(f"MATCH ({node_references[n]})")
         match_strings[-1] += node_references[n].extras
         if node_references[n].filters:
             match_strings.append("WHERE " + node_references[n].filters)
+    for n in nodes_with_id:
+        match_strings.append(f"MATCH ({node_references[n]})")
+        match_strings.append("WHERE " + node_references[n].filters)
+        match_strings.append(f"WITH {n}")
 
     # match edges
     for edge_id, eref in edge_references.items():
