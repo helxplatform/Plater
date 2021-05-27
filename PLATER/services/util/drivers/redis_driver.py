@@ -96,11 +96,11 @@ class RedisDriver:
                         array.append(new_row)
         return array
 
-    def transplile_TRAPI_cypher(self, trapi_question):
-        return cypher_query_answer_map(trapi_question)
+    def transplile_TRAPI_cypher(self, trapi_question, options={}):
+        return cypher_query_answer_map(trapi_question, **options)
 
-    async def answer_TRAPI_question(self, trapi_question):
-        cypher = self.transplile_TRAPI_cypher(trapi_question)
+    async def answer_TRAPI_question(self, trapi_question, options={}):
+        cypher = self.transplile_TRAPI_cypher(trapi_question, options)
         logger.info("RUNNING TRAPI QUERY: ")
         logger.info(cypher)
         results = await self.run(cypher)

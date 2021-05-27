@@ -289,8 +289,8 @@ class GraphInterface:
         def convert_to_dict(self, result):
             return self.driver.convert_to_dict(result)
 
-        async def answer_trapi_question(self, trapi_question):
-            response = await self.driver.answer_TRAPI_question(trapi_question)
+        async def answer_trapi_question(self, trapi_question, options={}):
+            response = await self.driver.answer_TRAPI_question(trapi_question, options=options)
             response.update({'query_graph': trapi_question})
             return response
 

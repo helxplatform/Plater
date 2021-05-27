@@ -149,7 +149,7 @@ class Neo4jHTTPDriver:
                 self._supports_apoc = False
         return self._supports_apoc
 
-    async def answer_TRAPI_question(self, trapi_question):
+    async def answer_TRAPI_question(self, trapi_question, options={}):
         cypher_query = get_query(trapi_question)
         logger.info("RUNNING TRAPI QUERY:")
         logger.info(cypher_query)
