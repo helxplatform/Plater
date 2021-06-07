@@ -27,9 +27,10 @@ class NodeReference():
         props = {}
         curie_filters = []
         curie = node.pop("id", None)
+        self.has_curie = False
         if curie is not None:
-            if isinstance(curie, str):
-                props['id'] = curie
+            if isinstance(curie, str) or (isinstance(curie, list) and len(curie) == 1):
+                props['id'] = curie if isinstance(curie, str) else curie[0]
             elif isinstance(curie, list):
                 for ci in curie:
                     # generate curie-matching condition
@@ -37,6 +38,7 @@ class NodeReference():
                 # union curie-matching filters together
             else:
                 raise TypeError("Curie should be a string or list of strings.")
+            self.has_curie = True
         label_filters = []
         if labels:
             biolink_regex = "^biolink:[A-Z][a-zA-Z]*$"
@@ -48,12 +50,10 @@ class NodeReference():
                 else:
                     other_label = upgrade_BiolinkEntity(label)
                 label_filters.append(f"'{other_label}' in {name}.category")
-
+        self._filters = ''
         if len(curie_filters):
-            filters = '( ' + ' OR '.join(curie_filters) + ') AND (' + ' OR '.join(label_filters) + ')'
-        else:
-            filters = ' OR '.join(label_filters)
-        self._filters = filters
+            filters = '( ' + ' OR '.join(curie_filters) + ')'
+            self._filters = filters
         node.pop('name', None)
         node.pop('is_set', False)
         props.update(node)
@@ -61,9 +61,9 @@ class NodeReference():
         self.name = name
         self.labels = labels
         self.prop_string = ' {' + ', '.join([f"`{key}`: {cypher_prop_string(props[key])}" for key in props]) + '}'
-        self._filters = filters
         if curie:
-            self._extras = '' #f' USING INDEX {name}:{labels[0]}(id)'
+            # redis graph doesnt support USING INDEX version 2.4.2
+            self._extras = '' #f' USING INDEX {name}:`{labels[0]}`(id)'
         else:
             self._extras = ''
         self._num = 0
@@ -72,7 +72,8 @@ class NodeReference():
         """Return the cypher node reference."""
         self._num += 1
         if self._num == 1:
-            return f'{self.name}' + f'{self.prop_string}' # + ''.join(f':`{label}`' for label in self.labels)
+            label = f':`{self.labels[0]}`' if self.labels else ''
+            return f'{self.name}' + label + f'{self.prop_string}' # + ''.join(f':`{label}`' for label in self.labels)
         return self.name
 
     @property
@@ -129,6 +130,7 @@ class EdgeReference:
         self._filters = filters
         has_type = 'predicate' in edge and edge['predicate']
         self.directed = edge.get('directed', has_type)
+        self.reversed = False
 
     def __str__(self):
         """Return the cypher edge reference."""
@@ -139,7 +141,7 @@ class EdgeReference:
         else:
             innards = self.name
         if self.directed:
-            return f'-[{innards}]->'
+            return f'-[{innards}]->' if not self.reversed else f'<-[{innards}]-'
         else:
             return f'-[{innards}]-'
 
@@ -176,17 +178,24 @@ def cypher_query_fragment_match(qgraph, max_connectivity=-1):
         match_strings[-1] += node_references[n].extras
         if node_references[n].filters:
             match_strings.append("WHERE " + node_references[n].filters)
+    nodes_so_far = []
     for n in nodes_with_id:
         match_strings.append(f"MATCH ({node_references[n]})")
-        match_strings.append("WHERE " + node_references[n].filters)
-        match_strings.append(f"WITH {n}")
+        if node_references[n].filters:
+            match_strings.append("WHERE " + node_references[n].filters)
+        nodes_so_far.append(n)
+        match_strings.append(f"WITH {', '.join(nodes_so_far)}")
 
     # match edges
     for edge_id, eref in edge_references.items():
         e = edges[edge_id]
         source_node = node_references[e['subject']]
         target_node = node_references[e['object']]
-        match_strings.append(f"MATCH ({source_node}){eref}({target_node})")
+        if target_node.has_curie and not source_node.has_curie:
+            eref.reversed = True
+            match_strings.append(f"MATCH ({target_node}){eref}({source_node})")
+        else:
+            match_strings.append(f"MATCH ({source_node}){eref}({target_node})")
         match_strings[-1] += source_node.extras + target_node.extras
         filters = [f'({c})' for c in [source_node.filters, target_node.filters, eref.filters] if c]
         if max_connectivity > -1:
