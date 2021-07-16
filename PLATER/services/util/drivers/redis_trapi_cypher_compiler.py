@@ -199,7 +199,7 @@ def cypher_query_fragment_match(qgraph, max_connectivity=-1):
         match_strings[-1] += source_node.extras + target_node.extras
         filters = [f'({c})' for c in [source_node.filters, target_node.filters, eref.filters] if c]
         if max_connectivity > -1:
-            filters.append(f"(size( ({target_node})-[]-() ) < {max_connectivity})")
+            filters.append(f"((indegree({target_node}) + outdegree({target_node}) ) < {max_connectivity})")
         if filters:
             match_strings.append("\nWHERE " + "\nAND ".join(filters))
 
