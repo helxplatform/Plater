@@ -47,7 +47,8 @@ class RedisDriver:
             return value
 
     async def run(self, query, **kwargs):
-        results = self.redis_graph.query(query, read_only=True)
+        query_timeout = kwargs.get('query_timeout', None)
+        results = self.redis_graph.query(query, read_only=True, timeout= query_timeout)
         headers = list(map(lambda x: RedisDriver.decode_if_byte(x[1]), results.header))
         response = []
         for row in results.result_set:
@@ -99,11 +100,11 @@ class RedisDriver:
     def transplile_TRAPI_cypher(self, trapi_question, options={}):
         return cypher_query_answer_map(trapi_question, **options)
 
-    async def answer_TRAPI_question(self, trapi_question, options={}):
+    async def answer_TRAPI_question(self, trapi_question, options={}, timeout=None):
         cypher = self.transplile_TRAPI_cypher(trapi_question, options)
         logger.info("RUNNING TRAPI QUERY: ")
         logger.info(cypher)
-        results = await self.run(cypher)
+        results = await self.run(cypher, query_timeout=timeout)
         results_dict = self.convert_to_dict(results)
         response = self.create_TRAPI_kg_response(trapi_question, results_dict)
         return response

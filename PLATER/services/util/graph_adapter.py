@@ -44,7 +44,7 @@ class GraphInterface:
             leaf_set = all_concepts - ancestry_set
             return leaf_set
 
-        def get_schema(self):
+        def get_schema(self, force_update=False):
             """
             Gets the schema of the graph. To be used by. Also generates graph summary
             :return: Dict of structure source label as outer most keys, target labels as inner keys and list of predicates
@@ -52,7 +52,7 @@ class GraphInterface:
             :rtype: dict
             """
             self.schema_raw_result = {}
-            if self.schema is None:
+            if self.schema is None or force_update:
                 query = """
                            MATCH (a)-[x]->(b)                                                                                  
                            RETURN DISTINCT labels(a) as source_labels, type(x) as predicate, labels(b) as target_labels
@@ -98,13 +98,6 @@ class GraphInterface:
                         schema_bag[subject][objct] = []
                     if predicate not in schema_bag[subject][objct]:
                         schema_bag[subject][objct].append(predicate)
-                    # do reverse
-                    if objct not in schema_bag:
-                        schema_bag[objct] = {}
-                    if subject not in schema_bag[objct]:
-                        schema_bag[objct][subject] = []
-                    if predicate not in schema_bag[objct][subject]:
-                        schema_bag[objct][subject].append(predicate)
                 self.schema = schema_bag
                 logger.info("schema done.")
                 if not self.summary:
@@ -289,8 +282,8 @@ class GraphInterface:
         def convert_to_dict(self, result):
             return self.driver.convert_to_dict(result)
 
-        async def answer_trapi_question(self, trapi_question, options={}):
-            response = await self.driver.answer_TRAPI_question(trapi_question, options=options)
+        async def answer_trapi_question(self, trapi_question, options={}, timeout=None):
+            response = await self.driver.answer_TRAPI_question(trapi_question, options=options, timeout=timeout)
             response.update({'query_graph': trapi_question})
             return response
 
