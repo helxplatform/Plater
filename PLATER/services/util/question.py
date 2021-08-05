@@ -2,7 +2,7 @@ import copy
 from functools import reduce
 from PLATER.services.util.graph_adapter import GraphInterface
 import time
-from reasoner.cypher import get_query
+from reasoner_transpiler.cypher import get_query
 
 class Question:
 

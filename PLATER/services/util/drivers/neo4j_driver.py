@@ -3,7 +3,7 @@ import traceback
 import httpx
 from PLATER.services.config import config
 from PLATER.services.util.logutil import LoggingUtil
-from reasoner.cypher import get_query
+from reasoner_transpiler.cypher import get_query
 
 logger = LoggingUtil.init_logging(__name__,
                                   config.get('logging_level'),

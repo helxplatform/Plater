@@ -6,8 +6,8 @@ starlette==0.13.6
 uvicorn==0.11.7
 httpx
 redis
-git+git://github.com/patrickkwang/biolink-model-toolkit@master#egg=bmt
-git+https://github.com/ranking-agent/reasoner.git
-git+https://github.com/TranslatorSRI/reasoner-pydantic@v1.0#egg=reasoner-pydantic
+reasoner-transpiler==1.7.1
+bmt==0.7.3
+git+https://github.com/TranslatorSRI/reasoner-pydantic@v1.1.2.1#egg=reasoner-pydantic
 git+https://github.com/patrickkwang/fastapi#egg=fastapi
 git+https://github.com/redislabs/redisgraph-py.git
