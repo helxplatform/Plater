@@ -2,7 +2,10 @@ import redis
 from PLATER.services.config import config
 from PLATER.services.util.logutil import LoggingUtil
 from PLATER.services.util.drivers.redis_trapi_cypher_compiler import cypher_query_answer_map
-from redisgraph import Graph, Node, Edge
+from redis.commands.graph import Graph, Node, Edge
+from redis.exceptions import ConnectionError
+from redis.backoff import NoBackoff
+from redis.retry import Retry
 from reasoner_converter.upgrading import upgrade_BiolinkRelation, upgrade_BiolinkEntity
 
 logger = LoggingUtil.init_logging(__name__,
@@ -15,13 +18,15 @@ class RedisDriver:
     def __init__(self, host, port=6379, password=None, graph_db_name='test'):
         self.redis_url = f'redis://:{password}@{host}:{port}' if password else f'redis://{host}:{port}'
         self.redis_client = None
-        self.sync_redis_client = redis.Redis(host=host,
+        self.sync_redis_client = redis.StrictRedis(host=host,
                                              port=port,
                                              password=password,
+                                             retry_on_error=[ConnectionError],
+                                             retry=Retry(backoff=NoBackoff(), retries=3),
                                              encoding='utf-8',
                                              decode_responses=True)
         self.graph_name = graph_db_name
-        self.redis_graph = Graph(self.graph_name, self.sync_redis_client)
+        self.redis_graph = Graph(name=self.graph_name, client=self.sync_redis_client)
         self.ping_redis()
 
     def ping_redis(self):

@@ -60,7 +60,7 @@ class NodeReference():
 
         self.name = name
         self.labels = labels
-        self.prop_string = ' {' + ', '.join([f"`{key}`: {cypher_prop_string(props[key])}" for key in props]) + '}'
+        self.prop_string = ' {' + ', '.join([f"`{key}`: {cypher_prop_string(props[key])}" for key in props if props[key]]) + '}'
         if curie:
             # redis graph doesnt support USING INDEX version 2.4.2
             self._extras = '' #f' USING INDEX {name}:`{labels[0]}`(id)'
