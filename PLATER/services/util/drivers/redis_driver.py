@@ -23,6 +23,7 @@ class RedisDriver:
                                              password=password,
                                              retry_on_error=[ConnectionError],
                                              retry=Retry(backoff=NoBackoff(), retries=3),
+                                             health_check_interval=2,
                                              encoding='utf-8',
                                              decode_responses=True)
         self.graph_name = graph_db_name
