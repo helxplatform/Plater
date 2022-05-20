@@ -117,6 +117,7 @@ class GraphInterface:
             hits = self.convert_to_dict(result)
             for hit in hits:
                 hit["node"] = dict(dict(hit["node"])["properties"])
+                hit["score"] = int(hit["score"])
             hits.sort(key=lambda hit: hit["score"])
             return hits
 
