@@ -98,11 +98,14 @@ class GraphInterface:
                 i += 1
                 if i == len(indexes):
                     i = 0
+            # Note that although the native Lucene implementation used by Neo4j will always return hits ordered by descending score
+            # i.e. highest to lowest score order, RediSearch does not do this, so an ORDER BY statement is necessary.
             statements = [
                 f"""
                 CALL db.idx.fulltext.queryNodes('{index}', '{cleaned_query}')
                 YIELD node, score
                 RETURN node, score
+                ORDER BY score, DESC
                 LIMIT {per_statement_limits[index]}
                 """
                 for index in indexes
