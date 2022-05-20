@@ -1,5 +1,6 @@
 import base64
 import traceback
+import re
 
 import httpx
 
@@ -43,6 +44,57 @@ class GraphInterface:
                 ancestry_set = ancestry_set.union(ancestors)
             leaf_set = all_concepts - ancestry_set
             return leaf_set
+
+        def search(self, query, indexes, fields=None, options={
+            "prefix_search": False
+        }):
+            """
+            Execute a query against the graph's RediSearch indexes
+            :param query: Search query.
+            :type query: str
+            :param indexes: List of indexes to search against.
+            :type indexes: list
+            :param [fields]: List of properties to search against. If none, searches all fields. Note that this argument is unimplemneted and will be ignored.
+            :type [fields]: list
+            :param [options]: Additional configuration options specifying how the search should be executed against the graph.
+            :type [options]: dict
+            :return: List of nodes and search scores
+            :rtype: List[dict]
+            """
+            prefix_search = options.get("prefix_search", False)
+            # It seems that stop words and token characters don't tokenize properly and simply break within
+            # redisgraph's current RediSearch implementation (https://github.com/RedisGraph/RedisGraph/issues/1638)
+            stop_words = [
+                'a', 'is', 'the', 'an', 'and', 'are', 'as', 'at', 'be', 'but', 'by', 'for', 'if', 'in', 'into', 'it',
+                'no', 'not', 'of', 'on', 'or', 'such', 'that', 'their', 'then', 'there', 'these', 'they', 'this', 'to',
+                'was', 'will', 'with'
+            ]
+            token_chars = [
+                ',', '.', '<', '>', '{', '}', '[', ']', '"', "'", ':', ';', '!', '@', '#', '$', '%', '^', '&', '*', '(',
+                ')', '-', '+', '=', '~'
+            ]
+            re_stop_words = r"\b(" + "|".join(stop_words) + r")\b\s*"
+            re_token_chars = "[" + re.escape("".join(token_chars)) + "]"
+            cleaned_query = re.sub(re_stop_words, "", query)
+            cleaned_query = re.sub(re_token_chars, " ", cleaned_query)
+            if prefix_search: cleaned_query += "*"
+            # Have to execute multi-index searches in a rudimentary way due to the limitations of redisearch in redisgraph.
+            statements = [
+                f"""
+                CALL db.idx.fulltext.queryNodes('{index}', '{cleaned_query}')
+                YIELD node, score
+                RETURN node, score
+                """
+                for index in indexes
+            ]
+            query = "UNION".join(statements)
+            logger.info(f"starting search query {query} on graph...")
+            logger.debug(f"cleaned query: {cleaned_query}")
+            result = self.driver.run_sync(query)
+            hits = self.convert_to_dict(result)
+            for hit in hits:
+                hit["node"] = dict(dict(hit["node"])["properties"])
+            return hits
 
         def get_schema(self, force_update=False):
             """
