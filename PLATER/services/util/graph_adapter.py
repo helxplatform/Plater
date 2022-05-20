@@ -46,7 +46,8 @@ class GraphInterface:
             return leaf_set
 
         def search(self, query, indexes, fields=None, options={
-            "prefix_search": False
+            "prefix_search": False,
+            "query_limit": 50
         }):
             """
             Execute a query against the graph's RediSearch indexes
@@ -62,6 +63,7 @@ class GraphInterface:
             :rtype: List[dict]
             """
             prefix_search = options.get("prefix_search", False)
+            query_limit = options.get("query_limit", 50)
             # It seems that stop words and token characters don't tokenize properly and simply break within
             # redisgraph's current RediSearch implementation (https://github.com/RedisGraph/RedisGraph/issues/1638)
             stop_words = [
@@ -79,12 +81,29 @@ class GraphInterface:
             cleaned_query = re.sub(re_token_chars, " ", cleaned_query)
             cleaned_query = cleaned_query.strip()
             if prefix_search: cleaned_query += "*"
+
             # Have to execute multi-index searches in a rudimentary way due to the limitations of redisearch in redisgraph.
+            # Divide the query limit evenly between each statement so that, for example, if a user searches two indexes for a term,
+            # they won't end up with 50 results from the first index and 0 from the second because the query limit is 50.
+            # Instead they'll get 25 from the first index, and 25 from the second.
+            per_statement_limit = query_limit // len(indexes)
+            remainder = query_limit % len(indexes)
+            per_statement_limits = {index: per_statement_limit for index in indexes}
+            # Distribute the remainder across each statement limit.
+            # So that, for example, if the limit is 50 and there are 3 indexes, it'll be distributed as {index0: 17, index1: 17, index2: 16}
+            i = 0
+            while remainder > 0:
+                per_statement_limits[indexes[i]] += 1
+                remainder -= 1
+                i += 1
+                if i == len(indexes):
+                    i = 0
             statements = [
                 f"""
                 CALL db.idx.fulltext.queryNodes('{index}', '{cleaned_query}')
                 YIELD node, score
                 RETURN node, score
+                LIMIT {per_statement_limits[index]}
                 """
                 for index in indexes
             ]
