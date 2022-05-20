@@ -105,7 +105,7 @@ class GraphInterface:
                 CALL db.idx.fulltext.queryNodes('{index}', '{cleaned_query}')
                 YIELD node, score
                 RETURN node, score
-                ORDER BY score, DESC
+                ORDER BY score DESC
                 LIMIT {per_statement_limits[index]}
                 """
                 for index in indexes
