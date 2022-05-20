@@ -117,6 +117,7 @@ class GraphInterface:
             hits = self.convert_to_dict(result)
             for hit in hits:
                 hit["node"] = dict(dict(hit["node"])["properties"])
+            hits.sort(key=lambda hit: hit["score"])
             return hits
 
         def get_schema(self, force_update=False):
