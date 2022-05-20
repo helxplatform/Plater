@@ -77,6 +77,7 @@ class GraphInterface:
             re_token_chars = "[" + re.escape("".join(token_chars)) + "]"
             cleaned_query = re.sub(re_stop_words, "", query)
             cleaned_query = re.sub(re_token_chars, " ", cleaned_query)
+            cleaned_query = cleaned_query.strip()
             if prefix_search: cleaned_query += "*"
             # Have to execute multi-index searches in a rudimentary way due to the limitations of redisearch in redisgraph.
             statements = [
