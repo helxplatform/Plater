@@ -81,11 +81,16 @@ class GraphInterface:
             re_token_chars = "[" + re.escape("".join(token_chars)) + "]"
             cleaned_query = re.sub(re_stop_words, "", query)
             cleaned_query = re.sub(re_token_chars, " ", cleaned_query)
-            # Replace more than 1 consecutive space with just 1 space, since multi-spaces can mess up the search alg.
+            # Replace more than 1 consecutive space with just 1 space.
             cleaned_query = re.sub(" +", " ", cleaned_query)
             cleaned_query = cleaned_query.strip()
             if prefix_search: cleaned_query += "*"
-            elif levenshtein_distance: cleaned_query = ("%" * levenshtein_distance) + cleaned_query + ("%" * levenshtein_distance)
+            # elif levenshtein_distance:
+            #     # Enforced maximum LD by Redisearch.
+            #     if levenshtein_distance > 3: levenshtein_distance = 3
+            #     levenshtein_str = "%" * levenshtein_distance
+            #     cleaned_query = levenshtein_str + re.sub(" ", levenshtein_str + " " + levenshtein_str, cleaned_query) + levenshtein_str
+            # elif levenshtein_distance: cleaned_query = ("%" * levenshtein_distance) + cleaned_query + ("%" * levenshtein_distance)
 
             # Have to execute multi-index searches in a rudimentary way due to the limitations of redisearch in redisgraph.
             # Divide the query limit evenly between each statement so that, for example, if a user searches two indexes for a term,
