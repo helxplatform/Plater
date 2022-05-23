@@ -47,6 +47,7 @@ class GraphInterface:
 
         def search(self, query, indexes, fields=None, options={
             "prefix_search": False,
+            "levenshtein_distance": 0,
             "query_limit": 50
         }):
             """
@@ -63,6 +64,7 @@ class GraphInterface:
             :rtype: List[dict]
             """
             prefix_search = options.get("prefix_search", False)
+            levenshtein_distance = options.get("levenshtein_distance", 0)
             query_limit = options.get("query_limit", 50)
             # It seems that stop words and token characters don't tokenize properly and simply break within
             # redisgraph's current RediSearch implementation (https://github.com/RedisGraph/RedisGraph/issues/1638)
@@ -81,6 +83,7 @@ class GraphInterface:
             cleaned_query = re.sub(re_token_chars, " ", cleaned_query)
             cleaned_query = cleaned_query.strip()
             if prefix_search: cleaned_query += "*"
+            elif levenshtein_distance: cleaned_query = ("%" * levenshtein_distance) + cleaned_query + ("%" * levenshtein_distance)
 
             # Have to execute multi-index searches in a rudimentary way due to the limitations of redisearch in redisgraph.
             # Divide the query limit evenly between each statement so that, for example, if a user searches two indexes for a term,
