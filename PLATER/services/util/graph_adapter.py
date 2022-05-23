@@ -81,6 +81,8 @@ class GraphInterface:
             re_token_chars = "[" + re.escape("".join(token_chars)) + "]"
             cleaned_query = re.sub(re_stop_words, "", query)
             cleaned_query = re.sub(re_token_chars, " ", cleaned_query)
+            # Replace more than 1 consecutive space with just 1 space, since multi-spaces can mess up the search alg.
+            cleaned_query = re.sub(" +", " ", cleaned_query)
             cleaned_query = cleaned_query.strip()
             if prefix_search: cleaned_query += "*"
             elif levenshtein_distance: cleaned_query = ("%" * levenshtein_distance) + cleaned_query + ("%" * levenshtein_distance)
