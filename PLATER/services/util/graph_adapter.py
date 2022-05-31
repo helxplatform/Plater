@@ -65,6 +65,7 @@ class GraphInterface:
             :rtype: List[dict]
             """
             prefix_search = options.get("prefix_search", False)
+            postprocessing_cypher = options.get("postprocessing_cypher", "")
             levenshtein_distance = options.get("levenshtein_distance", 0)
             query_limit = options.get("query_limit", 50)
             # It seems that stop words and token characters don't tokenize properly and simply break within
