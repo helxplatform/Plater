@@ -47,8 +47,9 @@ class GraphInterface:
 
         def search(self, query, indexes, fields=None, options={
             "prefix_search": False,
+            "postprocessing_cypher": "",
             "levenshtein_distance": 0,
-            "query_limit": 50
+            "query_limit": 50,
         }):
             """
             Execute a query against the graph's RediSearch indexes
@@ -114,6 +115,7 @@ class GraphInterface:
                 f"""
                 CALL db.idx.fulltext.queryNodes('{index}', '{cleaned_query}')
                 YIELD node, score
+                {postprocessing_cypher}
                 RETURN node, score
                 ORDER BY score DESC
                 LIMIT {per_statement_limits[index]}
