@@ -129,6 +129,7 @@ class GraphInterface:
             result = self.driver.run_sync(query)
             hits = self.convert_to_dict(result)
             for hit in hits:
+                hit["labels"] = dict(hit["node"])["labels"]
                 hit["node"] = dict(dict(hit["node"])["properties"])
                 hit["score"] = float(hit["score"])
             hits.sort(key=lambda hit: hit["score"], reverse=True)
