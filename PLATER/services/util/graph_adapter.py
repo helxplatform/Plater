@@ -87,12 +87,11 @@ class GraphInterface:
             cleaned_query = re.sub(" +", " ", cleaned_query)
             cleaned_query = cleaned_query.strip()
             if prefix_search: cleaned_query += "*"
-            # elif levenshtein_distance:
-            #     # Enforced maximum LD by Redisearch.
-            #     if levenshtein_distance > 3: levenshtein_distance = 3
-            #     levenshtein_str = "%" * levenshtein_distance
-            #     cleaned_query = levenshtein_str + re.sub(" ", levenshtein_str + " " + levenshtein_str, cleaned_query) + levenshtein_str
-            # elif levenshtein_distance: cleaned_query = ("%" * levenshtein_distance) + cleaned_query + ("%" * levenshtein_distance)
+            elif levenshtein_distance:
+                # Enforced maximum LD by Redisearch.
+                if levenshtein_distance > 3: levenshtein_distance = 3
+                levenshtein_str = "%" * levenshtein_distance # e.g. LD = 3; "short phrase" => "%%%short%%% %%%phrase%%%"
+                cleaned_query = levenshtein_str + re.sub(" ", levenshtein_str + " " + levenshtein_str, cleaned_query) + levenshtein_str
 
             # Have to execute multi-index searches in a rudimentary way due to the limitations of redisearch in redisgraph.
             # Divide the query limit evenly between each statement so that, for example, if a user searches two indexes for a term,
