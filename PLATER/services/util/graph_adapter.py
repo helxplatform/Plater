@@ -202,7 +202,8 @@ class GraphInterface:
                         labels = labels if isinstance(labels, list) else[labels]
                         count = node['count']
                         query = f"""
-                        MATCH (:{':'.join(labels)})-[e]->(b) WITH DISTINCT e , b 
+                        MATCH (n)-[e]->(b) WITH DISTINCT e , b
+                        WHERE labels(n) in {labels}
                         RETURN 
                             type(e) as edge_types, 
                             count(e) as edge_counts,
