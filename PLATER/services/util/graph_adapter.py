@@ -86,8 +86,9 @@ class GraphInterface:
             # Replace more than 1 consecutive space with just 1 space.
             cleaned_query = re.sub(" +", " ", cleaned_query)
             cleaned_query = cleaned_query.strip()
+            search_terms = cleaned_query.split(" ")
             if prefix_search: cleaned_query += "*"
-            elif levenshtein_distance:
+            if levenshtein_distance:
                 # Enforced maximum LD by Redisearch.
                 if levenshtein_distance > 3: levenshtein_distance = 3
                 levenshtein_str = "%" * levenshtein_distance # e.g. LD = 3; "short phrase" => "%%%short%%% %%%phrase%%%"
@@ -132,7 +133,10 @@ class GraphInterface:
                 hit["node"] = dict(dict(hit["node"])["properties"])
                 hit["score"] = float(hit["score"])
             hits.sort(key=lambda hit: hit["score"], reverse=True)
-            return hits
+            return {
+                "hits": hits,
+                "search_terms": search_terms
+            }
 
         def get_schema(self, force_update=False):
             """
