@@ -50,11 +50,11 @@ setup(
     include_package_data=True,
     install_requires=[
         "coverage",
-        "pyaml==20.3.1",
-        "pytest==5.4.1",
-        "pytest-asyncio==0.14.0",
-        "starlette==0.13.6",
-        "uvicorn==0.11.7",
+        "pyaml",
+        "pytest",
+        "pytest-asyncio",
+        "starlette",
+        "uvicorn",
         "httpx",
         "redis"
     ],
