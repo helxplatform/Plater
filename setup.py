@@ -10,7 +10,7 @@ current = os.path.abspath(os.path.dirname(__file__))
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-version = "1.9.8"
+version = "2.0.2"
 
 class PublishClass(Command):
     description = "Publish the package"
