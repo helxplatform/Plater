@@ -1,7 +1,7 @@
 """Tools for compiling QGraph into Cypher query."""
 import re
 from reasoner_converter.downgrading import downgrade_BiolinkEntity, downgrade_BiolinkPredicate
-from reasoner_converter.upgrading import upgrade_BiolinkEntity, upgrade_BiolinkRelation
+# from reasoner_converter.upgrading import upgrade_BiolinkEntity, upgrade_BiolinkRelation
 
 
 def cypher_prop_string(value):
@@ -48,7 +48,7 @@ class NodeReference():
                 if is_biolinkified:
                     other_label =  downgrade_BiolinkEntity(label)
                 else:
-                    other_label = upgrade_BiolinkEntity(label)
+                    other_label = label
                 label_filters.append(f"'{other_label}' in {name}.category")
         self._filters = ''
         if len(curie_filters):
@@ -116,7 +116,7 @@ class EdgeReference:
                     if is_biolink_predicate:
                         other_predicate = downgrade_BiolinkPredicate(predicate)
                     else:
-                        other_predicate = upgrade_BiolinkRelation(predicate)
+                        other_predicate = predicate
                     filters.append(f'type({name}) = "{other_predicate}" ')
                 filters = ' OR '.join(filters)
                 label = None
