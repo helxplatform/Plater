@@ -6,7 +6,7 @@ from redis.commands.graph import Graph, Node, Edge
 from redis.exceptions import ConnectionError
 from redis.backoff import NoBackoff
 from redis.retry import Retry
-# from PLATER.services.util.bl_helper import upgrade_BiolinkEntity, upgrade_BiolinkRelation
+# from PLATER.services.util.bl_helper import BLHelper
 
 logger = LoggingUtil.init_logging(__name__,
                                   config.get('logging_level'),
@@ -144,7 +144,7 @@ class RedisDriver:
                     if node_id not in collected_nodes:
                         new_node = {}
                         collected_nodes.add(node_id)
-                        # new_node['category'] = [upgrade_BiolinkEntity(x) for x in node['category']]
+                        # new_node['category'] = [BLHelper.upgrade_BiolinkEntity(x) for x in node['category']]
                         new_node['name'] = node.get('name', '')
                         new_node['attributes'] = []
                         for key, value in node.items():
@@ -170,7 +170,7 @@ class RedisDriver:
                     if edge_id not in collected_edges:
                         edge_in_query_graph = query_graph['edges'][qg_id]
                         source_real_id, target_real_id = id_pair
-                        # edge_type = upgrade_BiolinkRelation(edge_type)
+                        # edge_type = BLHelper.upgrade_BiolinkRelation(edge_type)
                         new_edge = {
                             'subject': source_real_id,
                             'object': target_real_id,

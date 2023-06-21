@@ -1,8 +1,8 @@
 """Tools for compiling QGraph into Cypher query."""
 import re
-from reasoner_converter.downgrading import downgrade_BiolinkEntity, downgrade_BiolinkPredicate
+#from reasoner_converter.downgrading import downgrade_BiolinkEntity, downgrade_BiolinkPredicate
 # from reasoner_converter.upgrading import upgrade_BiolinkEntity, upgrade_BiolinkRelation
-from PLATER.services.util.bl_helper import upgrade_BiolinkEntity
+#from PLATER.services.util.bl_helper import BLHelper
 
 
 def cypher_prop_string(value):
