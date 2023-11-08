@@ -1,5 +1,6 @@
 import asyncio
 from functools import reduce
+import re
 import httpx
 from PLATER.services.config import config
 
@@ -28,3 +29,62 @@ class BLHelper:
         response = await asyncio.gather(*tasks, return_exceptions=False)
         parents = list(reduce(lambda acc, value: acc + value, filter(lambda x: x, response), []))
         return list(filter(lambda x: x not in parents, concept_list))
+    
+    @staticmethod
+    def upgrade_BiolinkEntity(entity):
+        if entity.startswith("biolink."):
+            return entity
+        return "biolink." + BLHelper._pascal_case(entity)
+    
+    @staticmethod
+    def upgrade_BiolinkRelation(biolink_relation):
+        if biolink_relation is None:
+            return None
+        if biolink_relation.startswith("biolink."):
+            return biolink_relation
+        return "biolink." + BLHelper._snake_case(biolink_relation)
+
+    
+    @staticmethod
+    def _pascal_case(arg: str):
+        """Convert string to PascalCase.
+
+        Non-alphanumeric characters are replaced with _.
+        "ThisCase" is replaced with "this_case".
+        """
+        # replace _x with X
+        tmp = re.sub(
+            r"(?<=[a-zA-Z])_([a-z])",
+            lambda c: c.group(1).upper(),
+            arg
+        )
+        # upper-case first character
+        tmp = re.sub(
+            r"^[a-z]",
+            lambda c: c.group(0).upper(),
+            tmp
+        )
+        return tmp
+    
+
+    def _snake_case(arg: str):
+        """Convert string to snake_case.
+
+        Non-alphanumeric characters are replaced with _.
+        CamelCase is replaced with snake_case.
+        """
+        # replace non-alphanumeric characters with _
+        tmp = re.sub(r'\W', '_', arg)
+        # replace X with _x
+        tmp = re.sub(
+            r'(?<=[a-z])[A-Z](?=[a-z])',
+            lambda c: '_' + c.group(0).lower(),
+            tmp
+        )
+        # lower-case first character
+        tmp = re.sub(
+            r'^[A-Z](?=[a-z])',
+            lambda c: c.group(0).lower(),
+            tmp
+        )
+        return tmp

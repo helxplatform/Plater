@@ -1,7 +1,8 @@
 """Tools for compiling QGraph into Cypher query."""
 import re
-from reasoner_converter.downgrading import downgrade_BiolinkEntity, downgrade_BiolinkPredicate
-from reasoner_converter.upgrading import upgrade_BiolinkEntity, upgrade_BiolinkRelation
+#from reasoner_converter.downgrading import downgrade_BiolinkEntity, downgrade_BiolinkPredicate
+# from reasoner_converter.upgrading import upgrade_BiolinkEntity, upgrade_BiolinkRelation
+#from PLATER.services.util.bl_helper import BLHelper
 
 
 def cypher_prop_string(value):
@@ -21,7 +22,7 @@ class NodeReference():
         """Create a node reference."""
         node = dict(node)
         name = f'{node_id}' if not anonymous else ''
-        labels = node.pop('category', 'named_thing')
+        labels = node.pop('category', 'biolink.NamedThing')
         if not isinstance(labels, list):
             labels = [labels]
         props = {}
@@ -41,15 +42,9 @@ class NodeReference():
             self.has_curie = True
         label_filters = []
         if labels:
-            biolink_regex = "^biolink:[A-Z][a-zA-Z]*$"
             for label in labels:
-                label_filters.append(f"'{label}' in {name}.category")
-                is_biolinkified = re.match(biolink_regex, label)
-                if is_biolinkified:
-                    other_label =  downgrade_BiolinkEntity(label)
-                else:
-                    other_label = upgrade_BiolinkEntity(label)
-                label_filters.append(f"'{other_label}' in {name}.category")
+                other_label = label.replace('biolink:', 'biolink.')
+                label_filters.append(f"`{other_label}` in labels(`{name}`)")
         self._filters = ''
         if len(curie_filters):
             filters = '( ' + ' OR '.join(curie_filters) + ')'
@@ -72,7 +67,7 @@ class NodeReference():
         """Return the cypher node reference."""
         self._num += 1
         if self._num == 1:
-            label = f':`{self.labels[0]}`' if self.labels else ''
+            label = f':`{self.labels[0].replace("biolink:", "biolink.")}`' if self.labels else ''
             return f'{self.name}' + label + f'{self.prop_string}' # + ''.join(f':`{label}`' for label in self.labels)
         return self.name
 
@@ -109,14 +104,11 @@ class EdgeReference:
                 filters = ''
             elif isinstance(edge['predicate'], list):
                 filters = []
-                biolink_predicate_regex = "^biolink:[a-z][a-z_]*$"
+                # biolink_predicate_regex = "^biolink:[a-z][a-z_]*$"
                 for predicate in edge['predicate']:
-                    is_biolink_predicate = re.match(biolink_predicate_regex, predicate)
-                    filters.append(f'type({name}) = "{predicate}"')
-                    if is_biolink_predicate:
-                        other_predicate = downgrade_BiolinkPredicate(predicate)
-                    else:
-                        other_predicate = upgrade_BiolinkRelation(predicate)
+                    # is_biolink_predicate = re.match(biolink_predicate_regex, predicate)
+                    # filters.append(f'type({name}) = "{predicate}"')
+                    other_predicate = predicate.replace('biolink:', 'biolink.')
                     filters.append(f'type({name}) = "{other_predicate}" ')
                 filters = ' OR '.join(filters)
                 label = None
@@ -136,7 +128,7 @@ class EdgeReference:
         """Return the cypher edge reference."""
         self._num += 1
         if self._num == 1:
-            label = f':`{self.label}`' if self.label else ''
+            label = f':`{self.label.replace("biolink:", "biolink.")}`' if self.label else ''
             innards = f'{self.name}{label}'
         else:
             innards = self.name
