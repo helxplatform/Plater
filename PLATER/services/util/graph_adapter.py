@@ -129,8 +129,8 @@ class GraphInterface:
             result = self.driver.run_sync(query)
             hits = self.convert_to_dict(result)
             for hit in hits:
-                hit["labels"] = dict(hit["node"])["labels"]
-                hit["node"] = dict(dict(hit["node"])["properties"])
+                hit["labels"] = dict(hit["node"])["category"]
+                hit["node"] = dict(dict(hit["node"]))
                 hit["score"] = float(hit["score"])
             hits.sort(key=lambda hit: hit["score"], reverse=True)
             return {
@@ -164,13 +164,15 @@ class GraphInterface:
                     # Since there are some nodes in data currently just one label ['biolink:NamedThing']
                     # This filter is to avoid that scenario.
                     # @TODO need to remove this filter when data build avoids adding nodes with single ['biolink:NamedThing'] labels.
-                    filter_named_thing = lambda x: filter(lambda y: y != 'biolink:NamedThing', x)
+                    filter_named_thing = lambda x: filter(lambda y: y != 'biolink.NamedThing', x)
+                    format_to_old_type = lambda y: [x.replace('biolink.', 'biolink:') for x in y]
                     # For redis convert these to arrays
                     source_labels = [triplet['source_labels']] if isinstance(triplet['source_labels'], str) else triplet['source_labels']
                     target_labels = [triplet['target_labels']] if isinstance(triplet['target_labels'], str) else triplet['target_labels']
-                    source_labels, predicate, target_labels = self.find_biolink_leaves(filter_named_thing(source_labels)), \
-                                                              triplet['predicate'], \
-                                                              self.find_biolink_leaves(filter_named_thing(target_labels))
+                    source_labels, predicate, target_labels = self.find_biolink_leaves(format_to_old_type(filter_named_thing(source_labels))), \
+                                                              triplet['predicate'].replace('biolink.', 'biolink:'), \
+                                                              self.find_biolink_leaves(format_to_old_type(filter_named_thing(target_labels)))
+                
 
                     for source_label in source_labels:
                         for target_label in target_labels:
