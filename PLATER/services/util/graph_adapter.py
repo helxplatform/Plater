@@ -300,4 +300,3 @@ class GraphInterface:
     def __getattr__(self, item):
         # proxy function calls to the inner object.
         return getattr(self.instance, item)
-
