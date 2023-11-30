@@ -1,5 +1,6 @@
 import base64
 import traceback
+import re
 
 import httpx
 
@@ -43,6 +44,99 @@ class GraphInterface:
                 ancestry_set = ancestry_set.union(ancestors)
             leaf_set = all_concepts - ancestry_set
             return leaf_set
+
+        def search(self, query, indexes, fields=None, options={
+            "prefix_search": False,
+            "postprocessing_cypher": "",
+            "levenshtein_distance": 0,
+            "query_limit": 50,
+        }):
+            """
+            Execute a query against the graph's RediSearch indexes
+            :param query: Search query.
+            :type query: str
+            :param indexes: List of indexes to search against.
+            :type indexes: list
+            :param [fields]: List of properties to search against. If none, searches all fields. Note that this argument is unimplemneted and will be ignored.
+            :type [fields]: list
+            :param [options]: Additional configuration options specifying how the search should be executed against the graph.
+            :type [options]: dict
+            :return: List of nodes and search scores
+            :rtype: List[dict]
+            """
+            prefix_search = options.get("prefix_search", False)
+            postprocessing_cypher = options.get("postprocessing_cypher", "")
+            levenshtein_distance = options.get("levenshtein_distance", 0)
+            query_limit = options.get("query_limit", 50)
+            # It seems that stop words and token characters don't tokenize properly and simply break within
+            # redisgraph's current RediSearch implementation (https://github.com/RedisGraph/RedisGraph/issues/1638)
+            stop_words = [
+                'a', 'is', 'the', 'an', 'and', 'are', 'as', 'at', 'be', 'but', 'by', 'for', 'if', 'in', 'into', 'it',
+                'no', 'not', 'of', 'on', 'or', 'such', 'that', 'their', 'then', 'there', 'these', 'they', 'this', 'to',
+                'was', 'will', 'with'
+            ]
+            token_chars = [
+                ',', '.', '<', '>', '{', '}', '[', ']', '"', "'", ':', ';', '!', '@', '#', '$', '%', '^', '&', '*', '(',
+                ')', '-', '+', '=', '~'
+            ]
+            re_stop_words = r"\b(" + "|".join(stop_words) + r")\b\s*"
+            re_token_chars = "[" + re.escape("".join(token_chars)) + "]"
+            cleaned_query = re.sub(re_stop_words, "", query)
+            cleaned_query = re.sub(re_token_chars, " ", cleaned_query)
+            # Replace more than 1 consecutive space with just 1 space.
+            cleaned_query = re.sub(" +", " ", cleaned_query)
+            cleaned_query = cleaned_query.strip()
+            search_terms = cleaned_query.split(" ")
+            if prefix_search: cleaned_query += "*"
+            if levenshtein_distance:
+                # Enforced maximum LD by Redisearch.
+                if levenshtein_distance > 3: levenshtein_distance = 3
+                levenshtein_str = "%" * levenshtein_distance # e.g. LD = 3; "short phrase" => "%%%short%%% %%%phrase%%%"
+                cleaned_query = levenshtein_str + re.sub(" ", levenshtein_str + " " + levenshtein_str, cleaned_query) + levenshtein_str
+
+            # Have to execute multi-index searches in a rudimentary way due to the limitations of redisearch in redisgraph.
+            # Divide the query limit evenly between each statement so that, for example, if a user searches two indexes for a term,
+            # they won't end up with 50 results from the first index and 0 from the second because the query limit is 50.
+            # Instead they'll get 25 from the first index, and 25 from the second.
+            per_statement_limit = query_limit // len(indexes)
+            remainder = query_limit % len(indexes)
+            per_statement_limits = {index: per_statement_limit for index in indexes}
+            # Distribute the remainder across each statement limit.
+            # So that, for example, if the limit is 50 and there are 3 indexes, it'll be distributed as {index0: 17, index1: 17, index2: 16}
+            i = 0
+            while remainder > 0:
+                per_statement_limits[indexes[i]] += 1
+                remainder -= 1
+                i += 1
+                if i == len(indexes):
+                    i = 0
+            # Note that although the native Lucene implementation used by Neo4j will always return hits ordered by descending score
+            # i.e. highest to lowest score order, RediSearch does not do this, so an ORDER BY statement is necessary.
+            statements = [
+                f"""
+                CALL db.idx.fulltext.queryNodes('{index}', '{cleaned_query}')
+                YIELD node, score
+                {postprocessing_cypher}
+                RETURN distinct(node), score
+                ORDER BY score DESC
+                LIMIT {per_statement_limits[index]}
+                """
+                for index in indexes
+            ]
+            query = "UNION".join(statements)
+            logger.info(f"starting search query {query} on graph...")
+            logger.debug(f"cleaned query: {cleaned_query}")
+            result = self.driver.run_sync(query)
+            hits = self.convert_to_dict(result)
+            for hit in hits:
+                hit["labels"] = dict(hit["node"])["labels"]
+                hit["node"] = dict(dict(hit["node"])["properties"])
+                hit["score"] = float(hit["score"])
+            hits.sort(key=lambda hit: hit["score"], reverse=True)
+            return {
+                "hits": hits,
+                "search_terms": search_terms
+            }
 
         def get_schema(self, force_update=False):
             """
