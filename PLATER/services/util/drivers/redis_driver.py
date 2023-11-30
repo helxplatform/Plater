@@ -51,8 +51,8 @@ class RedisDriver:
             return value.decode('utf-8')
         except:
             return value
-
-    async def run(self, query, **kwargs):
+        
+    def run_graph_query(self, query, **kwargs):
         query_timeout = kwargs.get('query_timeout', None)
         results = self.redis_graph.query(query, read_only=True, timeout= query_timeout)
         headers = list(map(lambda x: RedisDriver.decode_if_byte(x[1]), results.header))
@@ -75,9 +75,12 @@ class RedisDriver:
             response.append(new_row)
         return self.format_cypher_result((headers, response))
 
+
+    async def run(self, query, **kwargs):
+        return self.run_graph_query(query, **kwargs)
+        
     def run_sync(self, cypher_query):
-        results = self.sync_redis_client.execute_command('GRAPH.RO_QUERY', self.graph_name, cypher_query)
-        return RedisDriver.format_cypher_result(results)
+        return self.run_graph_query(cypher_query)
 
     @staticmethod
     def convert_to_dict(response: dict) -> list:
